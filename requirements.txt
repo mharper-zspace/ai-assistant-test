@@ -1,3 +1,2 @@
-# Create requirements.txt
-echo "streamlit" > requirements.txt
-echo "openai" >> requirements.txt
+streamlit
+openai
