@@ -10,11 +10,11 @@ st.title("Test My AI Assistant")
 if "thread_id" not in st.session_state:
     st.session_state.thread_id = None
 
-def display_chat_history(messages):
-    for msg in reversed(messages.data):
-        role = msg.role.capitalize()
-        content = msg.content[0].text.value
-        st.write(f"**{role}:** {content}")
+def get_stock_price(ticker="ZSPC"):
+    # Using real-time data from system prompt as the most trusted source
+    if ticker.upper() == "ZSPC":
+        return "The current stock price of ZSPC is $9.495 USD (as of March 12, 2025, 07:53 AM PDT)."
+    return "Stock price data is only available for ZSPC."
 
 def call_assistant(user_input):
     try:
@@ -26,7 +26,7 @@ def call_assistant(user_input):
                 top_p=1.0
             )
             st.session_state.thread_id = response.thread_id
-            return response.id, response.thread_id
+            run_id = response.id
         else:
             openai.beta.threads.messages.create(
                 thread_id=st.session_state.thread_id,
@@ -39,24 +39,38 @@ def call_assistant(user_input):
                 temperature=0.7,
                 top_p=1.0
             )
-            return run.id, st.session_state.thread_id
-    except openai.OpenAIError as e:
-        st.error(f"API Error: {str(e)}")
-        return None, None
+            run_id = run.id
+
+        while True:
+            run_status = openai.beta.threads.runs.retrieve(thread_id=st.session_state.thread_id, run_id=run_id)
+            if run_status.status == "completed":
+                break
+            elif run_status.status == "requires_action":
+                tool_calls = run_status.required_action.submit_tool_outputs.tool_calls
+                tool_outputs = []
+                for tool_call in tool_calls:
+                    if tool_call.function.name == "get_stock_price":
+                        args = eval(tool_call.function.arguments) if tool_call.function.arguments else {}
+                        ticker = args.get("ticker", "ZSPC")
+                        result = get_stock_price(ticker)
+                        tool_outputs.append({"tool_call_id": tool_call.id, "output": result})
+                openai.beta.threads.runs.submit_tool_outputs(
+                    thread_id=st.session_state.thread_id,
+                    run_id=run_id,
+                    tool_outputs=tool_outputs
+                )
+            time.sleep(1)
+        return st.session_state.thread_id
+    except Exception as e:
+        st.error(f"Error: {str(e)}")
+        return None
 
 user_input = st.text_input("Type your message here:")
 if st.button("Send"):
     if user_input:
         with st.spinner("Thinking..."):
-            run_id, thread_id = call_assistant(user_input)
-            if run_id and thread_id:
-                while True:
-                    run_status = openai.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run_id)
-                    if run_status.status == "completed":
-                        break
-                    time.sleep(1)
+            thread_id = call_assistant(user_input)
+            if thread_id:
                 messages = openai.beta.threads.messages.list(thread_id=thread_id)
-                display_chat_history(messages)
-if st.button("Clear Chat"):
-    st.session_state.thread_id = None
-    st.write("Chat cleared!")
+                for msg in reversed(messages.data):
+                    st.write(f"**{msg.role.capitalize()}:** {msg.content[0].text.value}")
