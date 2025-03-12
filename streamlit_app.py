@@ -10,11 +10,17 @@ st.title("Test My AI Assistant")
 if "thread_id" not in st.session_state:
     st.session_state.thread_id = None
 
+import requests
+
 def get_stock_price(ticker="ZSPC"):
-    # Using real-time data from system prompt as the most trusted source
-    if ticker.upper() == "ZSPC":
-        return "The current stock price of ZSPC is $9.495 USD (as of March 12, 2025, 07:53 AM PDT)."
-    return "Stock price data is only available for ZSPC."
+    api_key = "45ITJ1V0GMTWDJHS"
+    url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker}&apikey={api_key}"
+    response = requests.get(url).json()
+    try:
+        price = response["Global Quote"]["05. price"]
+        return f"The current stock price of {ticker} is ${price} USD (last updated {response['Global Quote']['07. latest trading day']})."
+    except KeyError:
+        return "Unable to fetch stock price at this time."
 
 def call_assistant(user_input):
     try:
