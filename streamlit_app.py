@@ -3,7 +3,7 @@ import openai
 
 # Load API key from secrets (no hardcoding)
 openai.api_key = st.secrets["OPENAI_API_KEY"]
-assistant_id = st.secrets["ASSISTANT_ID"]  # Optional: Store Assistant ID too
+assistant_id = st.secrets["ASSISTANT_ID"]  # Your Assistant ID
 
 st.title("Test My AI Assistant")
 
@@ -17,15 +17,25 @@ if st.button("Send"):
                 assistant_id=assistant_id,
                 thread={"messages": [{"role": "user", "content": user_input}]}
             )
-            # Poll for completion (simplified for brevity)
-            run_id = response["id"]
-            thread_id = response["thread_id"]
+            # Access attributes with dot notation
+            run_id = response.id
+            thread_id = response.thread_id
+
+            # Poll for completion
             while True:
-                run_status = openai.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run_id)
-                if run_status["status"] == "completed":
+                run_status = openai.beta.threads.runs.retrieve(
+                    thread_id=thread_id,
+                    run_id=run_id
+                )
+                if run_status.status == "completed":
                     break
+                # Optional: Add a small delay to avoid overwhelming the API
+                import time
+                time.sleep(1)
+
+            # Fetch the messages from the thread
             messages = openai.beta.threads.messages.list(thread_id=thread_id)
-            assistant_response = messages["data"][0]["content"][0]["text"]["value"]
+            assistant_response = messages.data[0].content[0].text.value
             st.write(f"**Assistant:** {assistant_response}")
     else:
         st.write("Please enter a message.")
